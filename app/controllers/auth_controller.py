@@ -86,9 +86,9 @@ def login():
                 status_code=401
             )
 
-        # Create tokens
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        # Create tokens - convert user.id to string
+        access_token = create_access_token(identity=str(user.id))
+        refresh_token = create_refresh_token(identity=str(user.id))
 
         return success_response(
             data={
@@ -112,7 +112,7 @@ def refresh():
     """Refresh access token"""
     try:
         current_user_id = get_jwt_identity()
-        access_token = create_access_token(identity=current_user_id)
+        access_token = create_access_token(identity=str(current_user_id))
 
         return success_response(
             data={
@@ -134,7 +134,7 @@ def me():
     """Get current user info"""
     try:
         current_user_id = get_jwt_identity()
-        user = User.query.get(current_user_id)
+        user = User.query.get(int(current_user_id))  # Convert string ID back to integer
 
         if not user:
             return error_response(

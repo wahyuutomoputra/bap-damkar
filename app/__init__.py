@@ -6,10 +6,12 @@ from app.controllers.user_controller import user_bp
 from app.controllers.berita_acara_controller import berita_acara_bp
 from app.controllers.auth_controller import auth_bp
 from app.controllers.rescue_controller import rescue_bp
+from app.controllers.report_controller import report_bp
 from flask_swagger_ui import get_swaggerui_blueprint
 from app.docs.berita_acara_docs import berita_acara_docs
 from app.docs.user_docs import user_docs
 from app.docs.rescue_docs import rescue_docs
+from app.docs.report_docs import report_docs
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -63,7 +65,8 @@ def create_app(config_class=Config):
             "paths": {
                 **berita_acara_docs,
                 **user_docs,
-                **rescue_docs
+                **rescue_docs,
+                **report_docs
             }
         }
         return jsonify(swagger_config)
@@ -74,5 +77,6 @@ def create_app(config_class=Config):
     app.register_blueprint(user_bp)
     app.register_blueprint(berita_acara_bp)
     app.register_blueprint(rescue_bp)
+    app.register_blueprint(report_bp)
 
     return app 

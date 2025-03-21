@@ -6,7 +6,7 @@ from datetime import datetime, time
 
 berita_acara_bp = Blueprint('berita_acara', __name__, url_prefix='/berita-acara')
 
-@berita_acara_bp.route('/', methods=['GET'])
+@berita_acara_bp.route('', methods=['GET'], strict_slashes=False)
 def get_all_berita_acara():
     """Get all berita acara pemadaman"""
     try:
@@ -21,7 +21,7 @@ def get_all_berita_acara():
             errors=str(e)
         )
 
-@berita_acara_bp.route('/<int:id>', methods=['GET'])
+@berita_acara_bp.route('/<int:id>', methods=['GET'], strict_slashes=False)
 def get_berita_acara(id):
     """Get berita acara pemadaman by id"""
     try:
@@ -37,7 +37,7 @@ def get_berita_acara(id):
             status_code=404
         )
 
-@berita_acara_bp.route('/', methods=['POST'])
+@berita_acara_bp.route('', methods=['POST'], strict_slashes=False)
 def create_berita_acara():
     """Create new berita acara pemadaman"""
     try:
@@ -97,7 +97,7 @@ def create_berita_acara():
             errors=str(e)
         )
 
-@berita_acara_bp.route('/<int:id>', methods=['PUT'])
+@berita_acara_bp.route('/<int:id>', methods=['PUT'], strict_slashes=False)
 def update_berita_acara(id):
     """Update berita acara pemadaman"""
     try:
@@ -146,7 +146,7 @@ def update_berita_acara(id):
             errors=str(e)
         )
 
-@berita_acara_bp.route('/<int:id>', methods=['DELETE'])
+@berita_acara_bp.route('/<int:id>', methods=['DELETE'], strict_slashes=False)
 def delete_berita_acara(id):
     """Delete berita acara pemadaman"""
     try:

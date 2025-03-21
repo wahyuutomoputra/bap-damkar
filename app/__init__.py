@@ -22,9 +22,25 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     jwt.init_app(app)
     
-    # Simple CORS configuration
-    CORS(app)
-    
+    # Enable CORS for all routes
+    CORS(app, resources={r"/*": {"origins": "*"}})
+
+    # Add CORS headers to all responses
+    @app.after_request
+    def after_request(response):
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', '*')
+        response.headers.add('Access-Control-Allow-Methods', '*')
+        return response
+
+    # Handle OPTIONS requests
+    @app.route('/', methods=['OPTIONS'])
+    def handle_options():
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', '*')
+        response.headers.add('Access-Control-Allow-Methods', '*')
+        return response
 
     # Swagger configuration
     SWAGGER_URL = '/api/docs'

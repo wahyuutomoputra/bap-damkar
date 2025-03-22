@@ -1,9 +1,11 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from app.models.rescue import Rescue
 from app.models.berita_acara import BeritaAcaraPemadaman
 from app.utils.response_handler import success_response, error_response
 from sqlalchemy import func, extract
 from datetime import datetime, timedelta
+from calendar import monthrange
+from extensions import db
 
 report_bp = Blueprint('report', __name__, url_prefix='/api/report')
 
@@ -191,4 +193,129 @@ def get_berita_acara_trend():
                      'seluruh periode'
         })
     except Exception as e:
-        return error_response(str(e)) 
+        return error_response(str(e))
+
+@report_bp.route('/dashboard/monthly', methods=['GET'])
+def get_monthly_dashboard():
+    """Get monthly dashboard summary combining rescue and berita acara data"""
+    try:
+        # Get year and month from query parameters
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
+
+        # If year and month not provided, use current date
+        if not year or not month:
+            current_date = datetime.now()
+            year = current_date.year
+            month = current_date.month
+
+        # Validate year and month
+        if not (1 <= month <= 12):
+            return error_response(
+                message="Bulan harus antara 1 dan 12",
+                errors="Invalid month value",
+                status_code=400
+            )
+
+        # Get first and last day of the month
+        first_day = datetime(year, month, 1)
+        last_day = datetime(year, month, monthrange(year, month)[1])
+
+        # Rescue Summary
+        rescue_summary = db.session.query(
+            func.count(Rescue.id).label('total_rescue'),
+            func.sum(Rescue.korban_luka).label('total_luka'),
+            func.sum(Rescue.korban_meninggal).label('total_meninggal')
+        ).filter(
+            Rescue.tanggal.between(first_day.date(), last_day.date())
+        ).first()
+
+        # Rescue by jenis evakuasi
+        rescue_by_type = db.session.query(
+            Rescue.jenis_evakuasi,
+            func.count(Rescue.id).label('total')
+        ).filter(
+            Rescue.tanggal.between(first_day.date(), last_day.date())
+        ).group_by(Rescue.jenis_evakuasi).all()
+
+        # Rescue by location
+        rescue_by_location = db.session.query(
+            Rescue.kabupaten_kota,
+            func.count(Rescue.id).label('total')
+        ).filter(
+            Rescue.tanggal.between(first_day.date(), last_day.date())
+        ).group_by(Rescue.kabupaten_kota).all()
+
+        # Berita Acara Summary
+        berita_acara_summary = db.session.query(
+            func.count(BeritaAcaraPemadaman.id).label('total_kejadian'),
+            func.avg(BeritaAcaraPemadaman.respon_time).label('rata_rata_respon'),
+            func.min(BeritaAcaraPemadaman.respon_time).label('respon_tercepat'),
+            func.max(BeritaAcaraPemadaman.respon_time).label('respon_terlambat')
+        ).filter(
+            BeritaAcaraPemadaman.tanggal.between(first_day.date(), last_day.date())
+        ).first()
+
+        # Berita Acara by jenis bangunan
+        berita_acara_by_type = db.session.query(
+            BeritaAcaraPemadaman.jenis_bangunan,
+            func.count(BeritaAcaraPemadaman.id).label('total')
+        ).filter(
+            BeritaAcaraPemadaman.tanggal.between(first_day.date(), last_day.date())
+        ).group_by(BeritaAcaraPemadaman.jenis_bangunan).all()
+
+        # Daily breakdown for both
+        daily_rescue = db.session.query(
+            extract('day', Rescue.tanggal).label('day'),
+            func.count(Rescue.id).label('total')
+        ).filter(
+            Rescue.tanggal.between(first_day.date(), last_day.date())
+        ).group_by(extract('day', Rescue.tanggal)).all()
+
+        daily_berita_acara = db.session.query(
+            extract('day', BeritaAcaraPemadaman.tanggal).label('day'),
+            func.count(BeritaAcaraPemadaman.id).label('total')
+        ).filter(
+            BeritaAcaraPemadaman.tanggal.between(first_day.date(), last_day.date())
+        ).group_by(extract('day', BeritaAcaraPemadaman.tanggal)).all()
+
+        # Format response data
+        response_data = {
+            'period': {
+                'year': year,
+                'month': month,
+                'start_date': first_day.strftime('%Y-%m-%d'),
+                'end_date': last_day.strftime('%Y-%m-%d')
+            },
+            'rescue': {
+                'summary': {
+                    'total_rescue': rescue_summary.total_rescue or 0,
+                    'total_luka': rescue_summary.total_luka or 0,
+                    'total_meninggal': rescue_summary.total_meninggal or 0
+                },
+                'by_type': [{'jenis': t[0], 'total': t[1]} for t in rescue_by_type],
+                'by_location': [{'lokasi': l[0], 'total': l[1]} for l in rescue_by_location],
+                'daily_breakdown': [{'day': int(d[0]), 'total': d[1]} for d in daily_rescue]
+            },
+            'berita_acara': {
+                'summary': {
+                    'total_kejadian': berita_acara_summary.total_kejadian or 0,
+                    'rata_rata_respon': str(berita_acara_summary.rata_rata_respon) if berita_acara_summary.rata_rata_respon else None,
+                    'respon_tercepat': str(berita_acara_summary.respon_tercepat) if berita_acara_summary.respon_tercepat else None,
+                    'respon_terlambat': str(berita_acara_summary.respon_terlambat) if berita_acara_summary.respon_terlambat else None
+                },
+                'by_type': [{'jenis': t[0], 'total': t[1]} for t in berita_acara_by_type],
+                'daily_breakdown': [{'day': int(d[0]), 'total': d[1]} for d in daily_berita_acara]
+            }
+        }
+
+        return success_response(
+            data=response_data,
+            message="Berhasil mengambil ringkasan dashboard bulanan"
+        )
+
+    except Exception as e:
+        return error_response(
+            message="Gagal mengambil ringkasan dashboard bulanan",
+            errors=str(e)
+        ) 
